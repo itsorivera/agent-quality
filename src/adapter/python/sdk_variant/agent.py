@@ -37,7 +37,12 @@ from a2a.helpers import (
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.events import EventQueue
 from a2a.server.request_handlers import DefaultRequestHandler
-from a2a.server.routes import create_agent_card_routes, create_jsonrpc_routes
+from a2a.server.routes import (
+    add_a2a_routes_to_fastapi,
+    create_agent_card_routes,
+    create_jsonrpc_routes,
+    create_rest_routes,
+)
 from a2a.server.tasks import InMemoryTaskStore, TaskUpdater
 from a2a.types import (
     AgentCapabilities,
@@ -48,7 +53,7 @@ from a2a.types import (
     TaskState,
 )
 from a2a.utils.constants import PROTOCOL_VERSION_1_0, VERSION_HEADER  # type: ignore[attr-defined]
-from starlette.applications import Starlette
+from fastapi import FastAPI
 
 from a2a_agent.llm import ChatBackend, build_backend
 
@@ -158,15 +163,21 @@ class SdkChatExecutor(AgentExecutor):
 
 
 # ---------------------------------------------------------------------------
-# Fabrica de la aplicacion Starlette (como create_app del server manual).
+# Fabrica de la aplicacion FastAPI (como create_app del server manual).
 # ---------------------------------------------------------------------------
 
 
 def build_sdk_agent_app():
-    """Construye la app A2A usando el SDK, a partir de las mismas env vars.
+    """Construye la app A2A usando el SDK sobre FastAPI, desde las mismas env vars.
 
     Variables (iguales que la variante manual): CHAT_PROVIDER, OPENAI_API_KEY,
     OPENAI_MODEL, AGENT_NAME, AGENT_DESCRIPTION, PORT.
+
+    Diferencias con la version Starlette:
+      - add_a2a_routes_to_fastapi re-registra las rutas A2A como APIRoute, por
+        lo que aparecen en /docs (OpenAPI) con su schema. Starlette no tenia /docs.
+      - Siguientes pasos enterprise: app.add_middleware(...) (auth, OTel,
+        rate-limit) y Depends para inyectar el RequestHandler en endpoints propios.
     """
     load_dotenv(override=True)
 
@@ -216,13 +227,20 @@ def build_sdk_agent_app():
         agent_card=agent_card,
     )
 
-    routes = []
-    routes.extend(create_agent_card_routes(agent_card))
-    # El segundo flag habilita compatibilidad con clientes v0.3 JSON-RPC
-    # (metodos kebab-case message/send). Sin el, solo se habla v1.0.
-    routes.extend(
-        create_jsonrpc_routes(request_handler, "/", enable_v0_3_compat=True)
+    # El flag enable_v0_3_compat habilita clientes v0.3 JSON-RPC (kebab-case).
+    # Sin el, solo se habla v1.0 (SendMessage PascalCase + A2A-Version header).
+    agent_card_routes = create_agent_card_routes(agent_card)
+    jsonrpc_routes = create_jsonrpc_routes(
+        request_handler, "/", enable_v0_3_compat=True
     )
-    app = Starlette(routes=routes)
+
+    app = FastAPI(title=name, version="0.1.0")
+    add_a2a_routes_to_fastapi(
+        app,
+        agent_card_routes=agent_card_routes,
+        jsonrpc_routes=jsonrpc_routes,
+        # Binding REST opcional (produce rutas /rest en el card y en /docs):
+        # rest_routes=create_rest_routes(request_handler),
+    )
     app.state.a2a = request_handler  # util para tests
     return app
