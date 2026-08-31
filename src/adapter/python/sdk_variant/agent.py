@@ -37,12 +37,7 @@ from a2a.helpers import (
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.events import EventQueue
 from a2a.server.request_handlers import DefaultRequestHandler
-from a2a.server.routes import (
-    add_a2a_routes_to_fastapi,
-    create_agent_card_routes,
-    create_jsonrpc_routes,
-    create_rest_routes,
-)
+from a2a.server.routes import create_rest_routes  # solo documentacion: binding REST opcional
 from a2a.server.tasks import InMemoryTaskStore, TaskUpdater
 from a2a.types import (
     AgentCapabilities,
@@ -52,8 +47,10 @@ from a2a.types import (
     Role,
     TaskState,
 )
-from a2a.utils.constants import PROTOCOL_VERSION_1_0, VERSION_HEADER  # type: ignore[attr-defined]
+from a2a.utils.constants import PROTOCOL_VERSION_1_0  # type: ignore[attr-defined]
 from fastapi import FastAPI
+
+from sdk_variant.assembly import AgentSpec, mount_a2a_endpoints
 
 from a2a_agent.llm import ChatBackend, build_backend
 
@@ -163,21 +160,22 @@ class SdkChatExecutor(AgentExecutor):
 
 
 # ---------------------------------------------------------------------------
-# Fabrica de la aplicacion FastAPI (como create_app del server manual).
+# Receta del agente: TRANSPORTE-FREE. La placa web (FastAPI + rutas A2A) se
+# ensambla en sdk_variant/assembly.py (montaje) y sdk_variant/app.py (la
+# aplicacion del gateway). agent.py solo produce los "ingredientes": el
+# executor, la card y el handler que el composition root montara.
 # ---------------------------------------------------------------------------
 
 
-def build_sdk_agent_app():
-    """Construye la app A2A usando el SDK sobre FastAPI, desde las mismas env vars.
+def build_sdk_agent() -> AgentSpec:
+    """Construye la receta del agente conversacional (sin I/O, sin transporte).
 
-    Variables (iguales que la variante manual): CHAT_PROVIDER, OPENAI_API_KEY,
-    OPENAI_MODEL, AGENT_NAME, AGENT_DESCRIPTION, PORT.
+    Lee las mismas env vars que la variante manual: CHAT_PROVIDER,
+    OPENAI_API_KEY, OPENAI_MODEL, AGENT_NAME, AGENT_DESCRIPTION, PORT.
 
-    Diferencias con la version Starlette:
-      - add_a2a_routes_to_fastapi re-registra las rutas A2A como APIRoute, por
-        lo que aparecen en /docs (OpenAPI) con su schema. Starlette no tenia /docs.
-      - Siguientes pasos enterprise: app.add_middleware(...) (auth, OTel,
-        rate-limit) y Depends para inyectar el RequestHandler en endpoints propios.
+    Devuelve un AgentSpec (agent_id, card, handler); NO construye FastAPI ni
+    monta rutas. De eso se encarga el composition root (app.py) o el wrapper
+    de compat build_sdk_agent_app().
     """
     load_dotenv(override=True)
 
@@ -214,7 +212,7 @@ def build_sdk_agent_app():
         supported_interfaces=[
             AgentInterface(
                 protocol_binding="JSONRPC",
-                url=f"{public_url}/",
+                url=f"{public_url}/",  # la corrige mount_a2a_endpoints si es multi-agente
                 protocol_version=PROTOCOL_VERSION_1_0,
             )
         ],
@@ -227,20 +225,24 @@ def build_sdk_agent_app():
         agent_card=agent_card,
     )
 
-    # El flag enable_v0_3_compat habilita clientes v0.3 JSON-RPC (kebab-case).
-    # Sin el, solo se habla v1.0 (SendMessage PascalCase + A2A-Version header).
-    agent_card_routes = create_agent_card_routes(agent_card)
-    jsonrpc_routes = create_jsonrpc_routes(
-        request_handler, "/", enable_v0_3_compat=True
+    return AgentSpec(
+        agent_id="conversational",
+        name=name,
+        description=description,
+        card=agent_card,
+        handler=request_handler,
     )
 
-    app = FastAPI(title=name, version="0.1.0")
-    add_a2a_routes_to_fastapi(
-        app,
-        agent_card_routes=agent_card_routes,
-        jsonrpc_routes=jsonrpc_routes,
-        # Binding REST opcional (produce rutas /rest en el card y en /docs):
-        # rest_routes=create_rest_routes(request_handler),
-    )
-    app.state.a2a = request_handler  # util para tests
+
+def build_sdk_agent_app():
+    """Compat de un solo agente montado en la raiz (card en /.well-known).
+
+    Se mantiene para los tests y para el modo single-agent. Es el UNICO modulo
+    de tipo agente que ensambla transporte: la ruta enterprise de la industria
+    para N agentes es sdk_variant.app.create_app() (composition root).
+    """
+    spec = build_sdk_agent()
+    app = FastAPI(title=spec.name, version="0.1.0")
+    mount_a2a_endpoints(app, spec, root=True)
+    app.state.a2a = spec.handler  # util para tests
     return app
