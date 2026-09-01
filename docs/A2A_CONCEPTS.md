@@ -111,15 +111,15 @@ app.state.a2a = handler
 
 es **wiring de composicion**, NO logica de agente. Por eso vive en el
 composition root (`sdk_variant/app.py`), no en los modulos de receta
-(`sdk_variant/recipe.py`, `sdk_variant/sdk_agent.py`,
-`sdk_variant/portfolio_qa_agent.py`) ni en `server.py` (bootstrap de 5 lineas):
+(`sdk_variant/agents/*.py`, framework compartido en `recipe.py`/`spec.py`)
+ni en `server.py` (bootstrap de 5 lineas):
 
 ```
-sdk_variant/a2a_agent/{llm,protocol}.py  # dominio: ChatBackend + wire v0.3 [sin HTTP]
-  -> core.py                             # adapter A2A<->ChatBackend        [sin HTTP]
-  -> spec.py                             # AgentSpec: la "receta lista para montar"
-  -> recipe.py                           # AgentRecipe (Template Method) + AgentSettings
-  -> sdk_agent.py / portfolio_qa_agent.py # un archivo por agente (receta + factory)
+sdk_variant/a2a_agent/{llm,protocol}.py  # adapters del puerto LLM (OpenAI/echo) + wire v0.3
+  -> ports/{llm,spec}.py                 # PUERTOS puros: ChatBackend + AgentSpec [sin impl]
+  -> core.py                             # adapter del a2a-sdk (SdkChatAgent/Executor) [sin HTTP]
+  -> recipe.py                           # receta base (Template Method) + AgentSettings
+  -> agents/{sdk,portfolio_qa}_agent.py  # UN archivo por agente (receta + factory)
   -> app.py                              # create_app(): N agentes + auth + rutas [composition root]
   -> server.py                           # uvicorn.run(create_app())       [entrypoint]
 ```
