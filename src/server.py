@@ -16,10 +16,10 @@ import os
 from dotenv import load_dotenv
 import uvicorn
 
-from adapter.python.sdk_variant.agents.sdk_agent import build_sdk_agent
-from adapter.python.sdk_variant.agents.portfolio_qa_agent import build_portfolio_qa_agent
-from sdk_variant.app import create_app
-from sdk_variant.recipe import AgentSettings
+from a2a.agents.sdk_agent import build_sdk_agent
+from a2a.agents.portfolio_qa_agent import build_portfolio_qa_agent
+from app import create_app
+from a2a.a2a_recipe import AgentSettings
 
 
 def main() -> None:
