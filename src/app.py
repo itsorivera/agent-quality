@@ -37,9 +37,10 @@ from a2a.server.routes import (
     create_jsonrpc_routes,
 )
 
-from agents import build_portfolio_qa_agent, build_sdk_agent
-from sdk_variant.ports.spec import AGENT_CARD_WELL_KNOWN, AgentSpec
-from sdk_variant.recipe import AgentSettings
+from a2a.agents.portfolio_qa_agent import build_portfolio_qa_agent
+from a2a.agents.sdk_agent import build_sdk_agent
+from ports.spec import AGENT_CARD_WELL_KNOWN, AgentSpec
+from a2a.a2a_recipe import AgentSettings
 
 _PUBLIC_PATH_PREFIXES = ("/docs", "/redoc", "/openapi.json", "/health")
 _CARD_SUFFIX = "/.well-known/agent-card.json"
