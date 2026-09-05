@@ -15,8 +15,8 @@ import os
 
 from a2a.types import AgentSkill
 
-from a2a_manual.llm import build_backend
-from a2a_protocol.a2a_recipe import AgentRecipe, AgentSettings
+from utils.llm import build_backend
+from a2a_interface.a2a_recipe import AgentRecipe, AgentSettings
 from ports.llm import ChatBackend
 from ports.spec import AgentSpec
 

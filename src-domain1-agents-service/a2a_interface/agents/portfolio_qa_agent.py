@@ -22,8 +22,8 @@ from a2a.types import (
     StringList,
 )
 
-from a2a_manual.protocol import parts_to_text
-from a2a_protocol.a2a_recipe import AgentRecipe, AgentSettings
+from utils.protocol import parts_to_text
+from a2a_interface.a2a_recipe import AgentRecipe, AgentSettings
 from ports.llm import ChatBackend, ChatBackendBase
 from ports.spec import AgentSpec
 

@@ -14,7 +14,7 @@ from __future__ import annotations
 import os
 from typing import Any, AsyncIterator, Dict, List
 
-from a2a_manual.protocol import parts_to_text
+from utils.protocol import parts_to_text
 from ports.llm import ChatBackend, ChatBackendBase
 
 
@@ -42,10 +42,17 @@ class OpenAIBackend(ChatBackendBase):
     desde la API), no una simulacion de caracteres.
     """
 
-    def __init__(self, api_key: str, model: str = "gpt-4o-mini", temperature: float = 0.7):
+    def __init__(
+        self,
+        api_key: str,
+        model: str = "gpt-4o-mini",
+        temperature: float = 0.7,
+        base_url: str | None = None,
+    ):
         from openai import AsyncOpenAI
 
-        self._client = AsyncOpenAI(api_key=api_key)
+        base_url = base_url or os.getenv("OPENAI_BASE_URL")
+        self._client = AsyncOpenAI(api_key=api_key, base_url=base_url)
         self._model = model
         self._temperature = temperature
 
