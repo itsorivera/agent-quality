@@ -1,1 +1,0 @@
-"""Tests del paquete sdk_variant (pytest)."""
